@@ -1,33 +1,55 @@
-from .base_page import BasePage
-from selenium.webdriver.common.by import By
+import time
+import pytest
+from .pages.login_page import LoginPage
+from .pages.product_page import ProductPage
+from .pages.basket_page import BasketPage
 
-class ProductPage(BasePage):
-    ADD_TO_BASKET_BUTTON = (By.CSS_SELECTOR, ".btn-add-to-basket")
-    PRODUCT_NAME = (By.CSS_SELECTOR, ".product_main h1")
-    PRODUCT_PRICE = (By.CSS_SELECTOR, ".product_main .price_color")
-    SUCCESS_MESSAGE = (By.CSS_SELECTOR, ".alert-success .alertinner strong")
-    BASKET_TOTAL = (By.CSS_SELECTOR, ".alert-info .alertinner strong")
+@pytest.mark.need_review
+def test_guest_can_add_product_to_basket(browser):
+    link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/"
+    page = ProductPage(browser, link)
+    page.open()
+    page.add_product_to_basket()
+    page.solve_quiz_and_get_code()
+    product_name = page.get_product_name()
+    page.should_be_success_message(product_name)
+    product_price = page.get_product_price()
+    page.should_be_correct_basket_total(product_price)
 
-    def add_product_to_basket(self):
-        button = self.browser.find_element(*self.ADD_TO_BASKET_BUTTON)
-        button.click()
+@pytest.mark.need_review
+def test_guest_cant_see_product_in_basket_opened_from_product_page(browser):
+    link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/"
+    page = ProductPage(browser, link)
+    page.open()
+    page.go_to_basket()
+    basket_page = BasketPage(browser, browser.current_url)
+    basket_page.should_be_empty_basket()
+    basket_page.should_be_empty_message()
 
-    def get_product_name(self):
-        # Получаем название товара на странице продукта
-        return self.browser.find_element(*self.PRODUCT_NAME).text
+class TestUserAddToBasketFromProductPage:
+    @pytest.fixture(autouse=True)
+    def setup(self, browser):
+        link = "http://selenium1py.pythonanywhere.com/accounts/login/"
+        login_page = LoginPage(browser, link)
+        login_page.open()
+        email = str(time.time()) + "@fakemail.org"
+        password = "TestPassword123"
+        login_page.register_new_user(email, password)
+        login_page.should_be_authorized_user()
 
-    def get_product_price(self):
-        # Получаем цену товара на странице продукта
-        return self.browser.find_element(*self.PRODUCT_PRICE).text
+    def test_user_can_add_product_to_basket(self, browser):
+        link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/"
+        page = ProductPage(browser, link)
+        page.open()
+        page.add_product_to_basket()
+        page.solve_quiz_and_get_code()
+        product_name = page.get_product_name()
+        page.should_be_success_message(product_name)
+        product_price = page.get_product_price()
+        page.should_be_correct_basket_total(product_price)
 
-    def should_be_success_message(self, expected_product_name):
-        # Проверка, что название товара в сообщении совпадает с добавленным товаром
-        success_message = self.browser.find_element(*self.SUCCESS_MESSAGE).text
-        assert expected_product_name == success_message, \
-            f"Expected product name '{expected_product_name}' in the message, but got '{success_message}'"
-
-    def should_be_correct_basket_total(self, expected_product_price):
-        # Проверка, что стоимость корзины совпадает с ценой товара
-        basket_total = self.browser.find_element(*self.BASKET_TOTAL).text
-        assert expected_product_price == basket_total, \
-            f"Expected basket total '{expected_product_price}', but got '{basket_total}'"
+    def test_user_cant_see_success_message(self, browser):
+        link = "http://selenium1py.pythonanywhere.com/catalogue/coders-at-work_207/"
+        page = ProductPage(browser, link)
+        page.open()
+        assert page.is_not_element_present(*ProductPage.SUCCESS_MESSAGE), "Success message is presented, but should not be"
